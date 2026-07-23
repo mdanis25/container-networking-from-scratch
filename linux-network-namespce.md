@@ -225,13 +225,13 @@ This is needed because IP addresses are how devices find each other on a network
 When you would use this: whenever you set up a veth pair between two namespaces. Both ends need IP addresses on the same subnet so they can actually talk.
 
 ```bash
-sudo ip netns exec blue ip addr add 192.168.0.1/24 dev veth-blue
-sudo ip netns exec red ip addr add 192.168.0.2/24 dev veth-red
+sudo ip netns exec red ip addr add 192.168.0.1/24 dev veth-red
+sudo ip netns exec blue ip addr add 192.168.0.2/24 dev veth-blue
 ```
 
 ![Assign IP Addresses](assets/assign-ip-addr.png)
 
-**What this does:** This gives the `blue` namespace the IP address `192.168.0.1` on its `veth-blue` interface. And it gives the `red` namespace the IP address `192.168.0.2` on its `veth-red` interface. The `/24` means both of them are on the same subnet which is `192.168.0.0/24`.
+**What this does:** This gives the `red` namespace the IP address `192.168.0.1` on its `veth-red` interface. And it gives the `blue` namespace the IP address `192.168.0.2` on its `veth-blue` interface. The `/24` means both of them are on the same subnet which is `192.168.0.0/24`.
 
 **Why we need it:** Without IPs there is no networking. Period. The IP is what lets one end say hey I want to send data to the other end. The `/24` subnet tells both sides that they are on the same local network so they can reach each other directly without going through a router.
 
@@ -247,7 +247,7 @@ You should see the IP addresses assigned like this:
 ```
 7: veth-blue@if6: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default qlen 1000
     link/ether 2e:34:8e:0c:1c:6e brd ff:ff:ff:ff:ff:ff link-netns red
-    inet 192.168.0.1/24 scope global veth-blue
+    inet 192.168.0.2/24 scope global veth-blue
        valid_lft forever preferred_lft forever
 ```
 
@@ -256,7 +256,7 @@ and
 ```
 6: veth-red@if7: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default qlen 1000
     link/ether 22:21:fc:9e:d0:2b brd ff:ff:ff:ff:ff:ff link-netns blue
-    inet 192.168.0.2/24 scope global veth-red
+    inet 192.168.0.1/24 scope global veth-red
        valid_lft forever preferred_lft forever
 ```
 
@@ -315,11 +315,11 @@ This is important because without a default route, your namespace can only talk 
 When you would use this: when you want your namespace to be able to send traffic somewhere. Without a route the kernel has no idea where to forward the packet.
 
 ```bash
-sudo ip netns exec blue ip route add default via 192.168.0.1 dev veth-blue
-sudo ip netns exec red ip route add default via 192.168.0.2 dev veth-red
+sudo ip netns exec red ip route add default via 192.168.0.1 dev veth-red
+sudo ip netns exec blue ip route add default via 192.168.0.2 dev veth-blue
 ```
 
-**What this does:** This sets the default route for the `blue` namespace. It says anything that Blue wants to send, send it through `192.168.0.1` on the `veth-blue` interface. Same thing for Red but through `192.168.0.2`.
+**What this does:** This sets the default route for the `red` namespace. It says anything that Red wants to send, send it through `192.168.0.1` on the `veth-red` interface. Same thing for Blue but through `192.168.0.2`.
 
 **Why we need it:** Because routing is how the kernel decides where to send packets. If there is no route, the kernel just drops the packet with a "network unreachable" error. The default route gives the kernel a fallback path so it always knows where to send stuff.
 
@@ -330,22 +330,22 @@ sudo ip netns exec blue route
 sudo ip netns exec red route
 ```
 
-For blue you should see:
-
-```
-Kernel IP routing table
-Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
-default         192.168.0.1     0.0.0.0         UG    0      0        0 veth-blue
-192.168.0.0     0.0.0.0         255.255.255.0   U     0      0        0 veth-blue
-```
-
 For red you should see:
 
 ```
 Kernel IP routing table
 Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
-default         192.168.0.2     0.0.0.0         UG    0      0        0 veth-red
+default         192.168.0.1     0.0.0.0         UG    0      0        0 veth-red
 192.168.0.0     0.0.0.0         255.255.255.0   U     0      0        0 veth-red
+```
+
+For blue you should see:
+
+```
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+default         192.168.0.2     0.0.0.0         UG    0      0        0 veth-blue
+192.168.0.0     0.0.0.0         255.255.255.0   U     0      0        0 veth-blue
 ```
 
 ---
@@ -359,15 +359,15 @@ This is the moment of truth. If the ping works, that means our entire setup is c
 When you would use this: always after setting up any kind of network connection. Ping is the first thing you should try to verify that two machines or namespaces can reach each other.
 
 ```bash
-sudo ip netns exec blue ping 192.168.0.2
-sudo ip netns exec red ping 192.168.0.1
+sudo ip netns exec red ping 192.168.0.2
+sudo ip netns exec blue ping 192.168.0.1
 ```
 
-**What this does:** The first command goes into the `blue` namespace and tries to ping the IP `192.168.0.2` which is the `red` namespace. The second command does the opposite. It goes into the `red` namespace and pings `192.168.0.1` which is the `blue` namespace.
+**What this does:** The first command goes into the `red` namespace and tries to ping the IP `192.168.0.2` which is the `blue` namespace. The second command does the opposite. It goes into the `blue` namespace and pings `192.168.0.1` which is the `red` namespace.
 
 **Why we need it:** Because we need to verify that everything actually works. There is no point in setting all this up if you dont test it. Ping is the simplest and fastest way to check if two endpoints can talk to each other.
 
-Expected output from blue:
+Expected output from red:
 
 ```
 PING 192.168.0.2 (192.168.0.2) 56(84) bytes of data.
@@ -382,7 +382,7 @@ PING 192.168.0.2 (192.168.0.2) 56(84) bytes of data.
 rtt min/avg/max/mdev = 0.024/0.056/0.069/0.016 ms
 ```
 
-Expected output from red:
+Expected output from blue:
 
 ```
 PING 192.168.0.1 (192.168.0.1) 56(84) bytes of data.
@@ -418,18 +418,18 @@ sudo ip netns exec red arp
 
 **Why we need it:** Because it helps you understand what your namespace knows about the network. If you see an entry for the other sides IP with a MAC address, that means communication is working at the link layer.
 
-ARP table for blue:
-
-```
-Address                  HWtype  HWaddress           Flags Mask            Iface
-192.168.0.2              ether   22:21:fc:9e:d0:2b   C                     veth-blue
-```
-
 ARP table for red:
 
 ```
 Address                  HWtype  HWaddress           Flags Mask            Iface
-192.168.0.1              ether   2e:34:8e:0c:1c:6e   C                     veth-red
+192.168.0.2              ether   2e:34:8e:0c:1c:6e   C                     veth-red
+```
+
+ARP table for blue:
+
+```
+Address                  HWtype  HWaddress           Flags Mask            Iface
+192.168.0.1              ether   22:21:fc:9e:d0:2b   C                     veth-blue
 ```
 
 The `C` flag means the entry is complete and confirmed. Everything is working.
